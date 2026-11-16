@@ -1,0 +1,43 @@
+name: Python tests
+
+on:
+  push:
+    paths: ['python/**', '.github/workflows/python-*.yml']
+  pull_request:
+    paths: ['python/**', '.github/workflows/python-*.yml']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: python
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e . pytest pytest-asyncio pytest-socket "langchain-tests>=1.1.9,<1.2.0" "langchain>=1,<2" ruff mypy
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy langchain_onlinecompiler tests
+      - run: pytest -q tests/unit_tests --allow-hosts=127.0.0.1
+
+  lowest:
+    # The oldest versions the package allows: langchain-core 1.0.0 and onlinecompiler 0.9.0.
+    # langchain-tests needs a newer langchain-core, so the standard tests are left out here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install -e . "langchain-core==1.0.0" "onlinecompiler==0.9.0" pytest pytest-asyncio pytest-socket
+      - run: pytest -q tests/unit_tests --allow-hosts=127.0.0.1 --ignore=tests/unit_tests/test_standard.py --ignore=tests/unit_tests/test_agent.py

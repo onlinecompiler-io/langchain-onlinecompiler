@@ -1,0 +1,45 @@
+name: Python release
+
+# Pushing a tag python-vX.Y.Z publishes langchain-onlinecompiler X.Y.Z to PyPI by trusted publishing:
+# no token is stored anywhere. The tag must match __version__ in
+# python/langchain_onlinecompiler/__init__.py, and the unit tests must pass, or nothing is uploaded.
+on:
+  push:
+    tags: ['python-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: pip install -e . pytest pytest-asyncio pytest-socket "langchain-tests>=1.1.9,<1.2.0" "langchain>=1,<2" build
+      - run: pytest -q tests/unit_tests --allow-hosts=127.0.0.1
+      - name: The tag matches the version
+        run: test "python-v$(python -c 'import langchain_onlinecompiler as m; print(m.__version__)')" = "$GITHUB_REF_NAME"
+      - run: python -m build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: python/dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

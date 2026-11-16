@@ -1,0 +1,187 @@
+---
+title: "OnlineCompiler.io integration"
+description: "Integrate with the OnlineCompiler.io run-code and run-tests tools using LangChain Python."
+integration:
+  name: OnlineCompiler.io
+  pypi: langchain-onlinecompiler
+---
+
+[OnlineCompiler.io](https://onlinecompiler.io) is a code execution API: it runs a program in 46 languages and returns its output, or judges it against test cases and returns a verdict per test. Each run gets a fresh gVisor sandbox with no network access. This guide covers the two OnlineCompiler.io [tools](/oss/langchain/tools): `OnlineCompilerRunCode` and `OnlineCompilerRunTests`. For every setting and error, see the [package README](https://github.com/onlinecompiler-io/langchain-onlinecompiler/tree/main/python#readme).
+
+## Overview
+
+### Details
+
+| Class | Package | Serializable | JS support | Version |
+| :--- | :--- | :---: | :---: | :---: |
+| `OnlineCompilerRunCode` | [`langchain-onlinecompiler`](https://pypi.org/project/langchain-onlinecompiler/) | ❌ | ❌ | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-onlinecompiler?style=flat-square&label=%20) |
+| `OnlineCompilerRunTests` | [`langchain-onlinecompiler`](https://pypi.org/project/langchain-onlinecompiler/) | ❌ | ❌ | ![PyPI - Version](https://img.shields.io/pypi/v/langchain-onlinecompiler?style=flat-square&label=%20) |
+
+### Tool features
+
+| [Returns artifact](/oss/langchain/tools) | Native async | Return data | Pricing |
+| :---: | :---: | :---: | :---: |
+| ✅ | ❌ (`ainvoke` runs in a worker thread) | output, error, exit code, time, memory; or verdict, score and per-test verdicts | 100,000 free runs / month |
+
+- 46 languages, including Python, JavaScript, TypeScript, C, C++, Java, C#, Go, Rust, PHP, Ruby, SQL and R.
+- A fresh sandbox for every run, with no network access, up to 30 seconds and 512 MB.
+- Judging with seven output checkers (`trim`, `exact`, `tokens`, `float`, `rows`, `table`, `table_ordered`); hidden tests return only their verdict.
+- The model reads a short text result; the full JSON answer (with output files and, for judged runs, a signed receipt) is the `ToolMessage` artifact.
+
+---
+
+## Setup
+
+To use the tools, create a free OnlineCompiler.io API key and install the `langchain-onlinecompiler` package.
+
+### Credentials
+
+Create a key of type API at [api.onlinecompiler.io/compilers/api-keys/](https://api.onlinecompiler.io/compilers/api-keys/). The free plan includes 100,000 runs a month.
+
+```python Set API key icon="key"
+import getpass
+import os
+
+if "ONLINECOMPILER_API_KEY" not in os.environ:
+    os.environ["ONLINECOMPILER_API_KEY"] = getpass.getpass("Enter your OnlineCompiler.io API key: ")
+```
+
+It's also helpful (but not needed) to set up LangSmith for best-in-class observability/<Tooltip tip="Log each step of a model's execution to debug and improve it">tracing</Tooltip> of your tool calls. To enable automated tracing, set your [LangSmith](/langsmith/observability) API key:
+
+```python Enable tracing icon="flask"
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("Enter your LangSmith API key: ")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+### Installation
+
+The OnlineCompiler.io tools live in the `langchain-onlinecompiler` package:
+
+<CodeGroup>
+    ```python pip
+    pip install -U langchain-onlinecompiler
+    ```
+    ```python uv
+    uv add langchain-onlinecompiler
+    ```
+</CodeGroup>
+
+---
+
+## Instantiation
+
+Both tools read `ONLINECOMPILER_API_KEY`; you can also pass `api_key`. The toolkit gives you both tools with one set of settings.
+
+```python Initialize tool instance icon="robot"
+from langchain_onlinecompiler import (
+    OnlineCompilerRunCode,
+    OnlineCompilerRunTests,
+    OnlineCompilerToolkit,
+)
+
+run_code = OnlineCompilerRunCode()
+run_tests = OnlineCompilerRunTests()
+
+tools = OnlineCompilerToolkit().get_tools()  # both
+```
+
+---
+
+## Invocation
+
+### Directly
+
+`onlinecompiler_run_code` takes `compiler` (a compiler id such as `python-3.14`, `nodejs-24`, `gcc-15` or `openjdk-25`; [all ids](https://onlinecompiler.io/docs/compilers)), `code`, and optionally `input` (standard input) and `time_limit` (seconds, at most 30).
+
+```python Call tool icon="rocket"
+print(run_code.invoke({"compiler": "python-3.14", "code": "print(2 ** 100)"}))
+```
+
+```text
+status: success
+exit_code: 0
+time: 0.0309 s
+memory: 13296 KB
+truncated: false
+output:
+1267650600228229401496703205376
+error: (empty)
+```
+
+`onlinecompiler_run_tests` takes `compiler`, `code`, `tests` (each `{"input": ..., "expected_output": ...}`) and optionally `checker`. Each test counts as one run.
+
+```python Judge code icon="rocket"
+print(
+    run_tests.invoke(
+        {
+            "compiler": "python-3.14",
+            "code": "a, b = map(int, input().split())\nprint(a - b)",
+            "tests": [
+                {"input": "2 3", "expected_output": "5"},
+                {"input": "10 4", "expected_output": "14"},
+            ],
+        }
+    )
+)
+```
+
+```text
+verdict: wrong_answer
+score: 0
+passed: 0 of 2
+summary: 0 of 2 sample tests passed. Sample 1 expected 5 but the program printed -1.
+test 1: wrong_answer (0.0338 s, exit_code 0)
+  output:
+-1
+test 2: wrong_answer (0.0378 s, exit_code 0)
+  output:
+6
+```
+
+### As a ToolCall
+
+We can also invoke the tool with a model-generated `ToolCall`, in which case a @[`ToolMessage`] will be returned. Its `artifact` is the API's full JSON answer:
+
+```python ToolCall icon="briefcase"
+# This is usually generated by a model, but we'll create a tool call directly for demo purposes.
+model_generated_tool_call = {
+    "args": {"compiler": "python-3.14", "code": "print(input()[::-1])", "input": "stressed"},
+    "id": "1",
+    "name": run_code.name,
+    "type": "tool_call",
+}
+message = run_code.invoke(model_generated_tool_call)
+message.artifact["output"]  # 'desserts\n'
+```
+
+### Within an agent
+
+We can use the tools in an agent. For this we will need a model with tool-calling capabilities.
+
+```python Agent with tool icon="robot"
+# pip install -qU langchain langchain-openai
+from langchain.agents import create_agent
+
+agent = create_agent(
+    model="openai:gpt-5-mini",
+    tools=OnlineCompilerToolkit().get_tools(),
+    system_prompt="Run code to check your answers instead of guessing.",
+)
+
+# Run the agent
+agent.invoke(
+    {"messages": [{"role": "user", "content": "What is the 90th Fibonacci number? Compute it."}]}
+)
+```
+
+---
+
+## Errors
+
+A refusal the model can act on comes back to it as an error `ToolMessage`: an unknown compiler id or another bad request (HTTP 400), a request over 32 MB (413), a limit such as runs at once or the monthly allowance (429, where nothing ran and nothing was counted), or a failure on the service's side. Pass `handle_tool_error=False` to have these raised as `OnlineCompilerToolError` instead. A refused API key (HTTP 401, 403 or 404) is always raised as `AuthenticationError`, since the model cannot fix it.
+
+---
+
+## API reference
+
+For all OnlineCompiler.io tool settings, see the [package README](https://github.com/onlinecompiler-io/langchain-onlinecompiler/tree/main/python#readme). For the REST API itself, see [onlinecompiler.io/docs](https://onlinecompiler.io/docs).
