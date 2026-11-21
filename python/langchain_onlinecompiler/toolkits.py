@@ -23,7 +23,7 @@ class OnlineCompilerToolkit(BaseToolkit):
 
     Setup:
         Set `ONLINECOMPILER_API_KEY` to a free key from
-        https://api.onlinecompiler.io/compilers/api-keys/, or pass `api_key`.
+        https://api.onlinecompiler.io/compilers/api-keys/?utm_source=langchain, or pass `api_key`.
 
     Instantiation:
         ```python

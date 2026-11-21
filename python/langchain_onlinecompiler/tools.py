@@ -29,7 +29,7 @@ DEFAULT_BASE_URL = "https://api.onlinecompiler.io"
 # queueing.
 DEFAULT_TIMEOUT = 90.0
 API_KEY_ENV = "ONLINECOMPILER_API_KEY"
-SIGNUP_URL = "https://api.onlinecompiler.io/compilers/api-keys/"
+SIGNUP_URL = "https://api.onlinecompiler.io/compilers/api-keys/?utm_source=langchain"
 COMPILERS_URL = "https://onlinecompiler.io/docs/compilers"
 NO_API_KEY = (
     f"No OnlineCompiler.io API key: pass api_key or set {API_KEY_ENV}. "
@@ -302,7 +302,7 @@ class OnlineCompilerRunCode(_OnlineCompilerTool):
 
     Setup:
         Install `langchain-onlinecompiler` and set `ONLINECOMPILER_API_KEY` to a free
-        key from https://api.onlinecompiler.io/compilers/api-keys/.
+        key from https://api.onlinecompiler.io/compilers/api-keys/?utm_source=langchain.
 
         ```bash
         pip install -U langchain-onlinecompiler
@@ -405,7 +405,7 @@ class OnlineCompilerRunTests(_OnlineCompilerTool):
 
     Setup:
         Install `langchain-onlinecompiler` and set `ONLINECOMPILER_API_KEY` to a free
-        key from https://api.onlinecompiler.io/compilers/api-keys/.
+        key from https://api.onlinecompiler.io/compilers/api-keys/?utm_source=langchain.
 
     Instantiation:
         ```python

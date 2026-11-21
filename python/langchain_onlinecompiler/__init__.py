@@ -13,7 +13,7 @@ from langchain_onlinecompiler.tools import (
     TestCase,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "AuthenticationError",
